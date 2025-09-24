@@ -32,7 +32,8 @@ def generate_card(request): #명함 생성
 
             card_img.save(filepath)
 
-            download_url = request.build_absolute_uri(f'/download/{filename}/')
+            server_ip = request.get_host()
+            download_url = f'http://{server_ip}/download/{filename}/'
             qr_img = generate_qr_code(download_url)
 
             qr_filename = f"qr_{uuid.uuid4().hex[:8]}.png"

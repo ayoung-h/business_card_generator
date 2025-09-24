@@ -180,7 +180,7 @@ def draw_galaxy_template(draw, width, height, colors, user_data, layout): #ê°¤ëŸ
     font_medium = get_font(34, 'regular')
     font_small = get_font(30, 'regular')
 
-    draw.text((110, 150), user_data['name'], fill=['accent'], font=font_large)
+    draw.text((110, 150), user_data['name'], fill=colors['accent'], font=font_large)
     draw.text((110, 220), user_data['school'], fill=(200, 200, 255), font=font_medium)
     draw.text((110, 280), user_data['phone'], fill=(255, 255, 200), font=font_small)
 
