@@ -47,6 +47,31 @@ def generate_color_palette(base_color_hex): #기본 색상 바탕 팔레트 생�
 
     return colors
 
+def get_font_path():
+    font_dir = os.path.join(settings.BASE_DIR, 'static', 'fonts')
+    return {
+        'regular': os.path.join(font_dir, 'NanumGothic.ttf'),
+        'bold': os.path.join(font_dir, 'NanumGothicBold.ttf'),
+        'extrabold': os.path.join(font_dir, 'NanumGothicExtraBold.ttf')
+    }
+
+def get_font(size, weight='regular'):
+    font_paths = get_font_path()
+
+    try:
+        if weight == 'bold' and os.path.exists(font_paths['bold']):
+            return ImageFont.truetype(font_paths['bold'], size)
+        elif weight == 'extrabold' and os.path.exists(font_paths['extrabold']):
+            return ImageFont.truetype(font_paths['extrabold'], size)
+        elif os.path.exists(font_paths['regular']):
+            return ImageFont.truetype(font_paths['regular'], size)
+        else:
+            print(f"나눔고딕 폰트를 찾을 수 없습니다. 기본 폰트를 사용합니다.")
+            return ImageFont.load_default()
+    except Exception as e:
+        print(f"폰트 로드 오류: {e}")
+        return ImageFont.load_default()
+
 def create_business_card(user_data): #명함 이미지 생성
     template = random.choice(TEMPLATES)
     theme = random.choice(COLOR_THEMES)
@@ -84,14 +109,9 @@ def draw_modern_template(draw, width, height, colors, user_data, layout): #모�
 
     draw.rectangle([50, 50, width-50, height-50], outline=colors['accent'], width=3)
 
-    try:
-        font_large = ImageFont.truetype("arial.ttf", 48)
-        font_medium = ImageFont.truetype("arial.ttf", 32)
-        font_small = ImageFont.truetype("arial.ttf", 24)
-    except:
-        font_large = ImageFont.load_default()
-        font_medium = ImageFont.load_default()
-        font_small = ImageFont.load_default()
+    font_large = get_font(48, 'bold')
+    font_medium = get_font(32, 'regular')
+    font_small = get_font(24, 'regular')
 
     draw.text((100, 150), user_data['name'], fill=colors['dark'], font=font_large)
     draw.text((100, 220), user_data['school'], fill=colors['dark'], font=font_medium)
@@ -107,15 +127,10 @@ def draw_cute_template(draw, width, height, colors, user_data, layout): #큐트 
         draw.ellipse([x, y, x+30, y+30], fill=colors['accent'])
 
     draw.rounded_rectangle([40, 40, width-40, height-40], radius=20, outline=colors['primary'], width=4)
-
-    try:
-        font_large = ImageFont.truetype("arial.ttf", 42)
-        font_medium = ImageFont.truetype("arial.ttf", 28)
-        font_small = ImageFont.truetype("arial.ttf", 22)
-    except:
-        font_large = ImageFont.load_default()
-        font_medium = ImageFont.load_default()
-        font_small = ImageFont.load_default()
+    
+    font_large = get_font(42, 'bold')
+    font_medium = get_font(28, 'regular')
+    font_small = get_font(22, 'regular')
 
     draw.text((width//2-100, 180), user_data['name'], fill=colors['dark'], font=font_large)
     draw.text((width//2-80, 240), user_data['school'], fill=colors['dark'], font=font_medium)
@@ -128,14 +143,9 @@ def draw_retro_template(draw, width, height, colors, user_data, layout): #레트
     for i in range(5):
         draw.rectangle([10+i*2, 10+i*2, width-10-i*2, height-10-i*2], outline=colors['primary'], width=2)
 
-    try:
-        font_large = ImageFont.truetype("arial.ttf", 44)
-        font_medium = ImageFont.truetype("arial.ttf", 30)
-        font_small = ImageFont.truetype("arial.ttf", 26)
-    except:
-        font_large = ImageFont.load_default()
-        font_medium = ImageFont.load_default()
-        font_small = ImageFont.load_default()
+    font_large = get_font(44, 'bold')
+    font_medium = get_font(30, 'regular')
+    font_small = get_font(26, 'regular')
 
     draw.text((120, 160), user_data['name'], fill=colors['dark'], font=font_large)
     draw.text((120, 220), user_data['school'], fill=colors['dark'], font=font_medium)
@@ -149,14 +159,9 @@ def draw_neon_template(draw, width, height, colors, user_data, layout): #네온 
         alpha = 255 - thickness * 20
         draw.rectangle([60-thickness, 60-thickness, width-60+thickness, height-60+thickness], outline=neon_color, width=thickness)
 
-    try:
-        font_large = ImageFont.truetype("arial.ttf", 46)
-        font_medium = ImageFont.truetype("arial.ttf", 32)
-        font_small = ImageFont.truetype("arial.ttf", 28)
-    except:
-        font_large = ImageFont.load_default()
-        font_medium = ImageFont.load_default()
-        font_small = ImageFont.load_default()
+    font_large = get_font(46, 'bold')
+    font_medium = get_font(32, 'regular')
+    font_small = get_font(28, 'regular')
 
     draw.text((100, 150), user_data['name'], fill=(255, 255, 255), font=font_large)
     draw.text((100, 220), user_data['school'], fill=colors['accent'], font=font_medium)
@@ -171,14 +176,9 @@ def draw_galaxy_template(draw, width, height, colors, user_data, layout): #갤�
         brightness = random.randint(100, 255)
         draw.point((x, y), fill=(brightness, brightness, brightness))
 
-    try:
-        font_large = ImageFont.truetype("arial.ttf", 48)
-        font_medium = ImageFont.truetype("arial.ttf", 34)
-        font_small = ImageFont.truetype("arial.ttf", 30)
-    except:
-        font_large = ImageFont.load_default()
-        font_medium = ImageFont.load_default()
-        font_small = ImageFont.load_default()
+    font_large = get_font(48, 'bold')
+    font_medium = get_font(34, 'regular')
+    font_small = get_font(30, 'regular')
 
     draw.text((110, 150), user_data['name'], fill=['accent'], font=font_large)
     draw.text((110, 220), user_data['school'], fill=(200, 200, 255), font=font_medium)
@@ -190,14 +190,9 @@ def draw_minimalist_template(draw, width, height, colors, user_data, layout): #�
     draw.line([(100, 140), (width-100, 140)], fill=colors['primary'], width=2)
     draw.line([(100, height-100), (width-100, height-100)], fill=colors['primary'], width=2)
 
-    try:
-        font_large = ImageFont.truetype("arial.ttf", 42)
-        font_medium = ImageFont.truetype("arial.ttf", 28)
-        font_small = ImageFont.truetype("arial.ttf", 24)
-    except:
-        font_large = ImageFont.load_default()
-        font_medium = ImageFont.load_default()
-        font_small = ImageFont.load_default()
+    font_large = get_font(42, 'bold')
+    font_medium = get_font(28, 'regular')
+    font_small = get_font(24, 'regular')
 
     draw.text((120, 180), user_data['name'], fill=(50, 50, 50), font=font_large)
     draw.text((120, 240), user_data['school'], fill=(100, 100, 100), font=font_medium)
@@ -212,14 +207,9 @@ def draw_grunge_template(draw, width, height, colors, user_data, layout): #그�
         x2, y2 = random.randint(0, width), random.randint(0, height)
         draw.line([(x1, y1), (x2, y2)], fill=colors['accent'], width=random.randint(1,3))
 
-    try:
-        font_large = ImageFont.truetype("arial.ttf", 44)
-        font_medium = ImageFont.truetype("arial.ttf", 30)
-        font_small = ImageFont.truetype("arial.ttf", 26)
-    except:
-        font_large = ImageFont.load_default()
-        font_medium = ImageFont.load_default()
-        font_small = ImageFont.load_default()
+    font_large = get_font(44, 'bold')
+    font_medium = get_font(30, 'regular')
+    font_small = get_font(26, 'regular')
 
     draw.text((100, 160), user_data['name'], fill=colors['light'], font=font_large)
     draw.text((100, 220), user_data['school'], fill=colors['light'], font=font_medium)
