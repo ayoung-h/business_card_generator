@@ -31,3 +31,40 @@ def generate_card(request): #명함 생성
             os.makedirs(os.path.dirname(filepath), exist_ok=True)
 
             card_img.save(filepath)
+
+            download_url = request.build_absolute_uri(f'/download/{filename}/')
+            qr_img = generate_qr_code(download_url)
+
+            qr_filename = f"qr_{uuid.uuid4().hex[:8]}.png"
+            qr_filepath = os.path.join(settings.MEDIA_ROOT, 'qrcodes', qr_filename)
+
+            os.makedirs(os.path.dirname(qr_filepath), exist_ok=True)
+
+            qr_img.save(qr_filepath)
+
+            return JsonResponse({
+                'success': True,
+                'card_url': f'/media/cards/{filename}',
+                'qr_url': f'/media/qrcodes/{qr_filename}',
+                'download_url': download_url,
+                'template': template,
+            })
+        
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': str(e)
+            })
+        
+    return JsonResponse({'success': False, 'error': 'POST method required'})
+
+def download_card(request, filename): #명함 다운로드
+    filepath = os.path.join(settings.MEDIA_ROOT, 'cards', filename)
+
+    if not os.path.exists(filepath):
+        raise Http404("파일을 찾을 수 없습니다.")
+    
+    with open(filepath, 'rb') as f:
+        response = HttpResponse(f.read(), content_type='image/png')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
