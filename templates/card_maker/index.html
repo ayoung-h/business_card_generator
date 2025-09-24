@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>랜덤 명함 제작</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .container {
+            padding-top: 50px;
+        }
+        .card {
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            border: none;
+        }
+        .btn-primary {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            border: none;
+            border-radius: 25px;
+            padding: 15px 30px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+        .result-section {
+            display: none;
+            margin-top: 30px;
+        }
+        .card-preview {
+            max-width: 100%;
+            border-radius: 15px;
+            box-shadow: 0 15px 30px rgba(0,0,0,0.2);
+        }
+        .qr-code {
+            max-width: 200px;
+            margin: 0 auto;
+            display: block;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .spinner-border {
+            color: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-body p-5">
+                        <h1 class="text-center mb-4" style="color: #667eea; font-weight: bold;">랜덤 명함 제작</h1>
+                        <p class="text-center text-muted mb-5">정보를 입력하면 나만의 명함을 만들어드립니다!</p>
+
+                        <form id="cardForm">
+                            <div class="mb-4">
+                                <label for="name" class="form-label">이름</label>
+                                <input type="text" class="form-control" id="name" name="name" placeholder="홍길동" required>
+                            </div>
+
+                            <div class="mb-4">
+                                <label for="school" class="form-label">학교</label>
+                                <input type="text" class="form-control" id="school" name="school" placeholder="○○고등학교" required>
+                            </div>
+
+                            <div class="mb-4">
+                                <label for="phone" class="form-label">전화번호</label>
+                                <input type="text" class="form-control" id="phone" name="phone" placeholder="010-1234-5678" required>
+                            </div>
+
+                            <div class="mb-4">
+                                <label for="favoriteColor" class="form-label">좋아하는 색깔</label>
+                                <input type="color" class="form-control form-control-color" id="favoriteColor" name="favorite_color" value="#3498db">
+                            </div>
+
+                            <div class="text-center">
+                                <button type="submit" class="btn btn-primary btn-lg">랜덤 명함 만들기</button>
+                            </div>
+                        </form>
+
+                        <div class="loading">
+                            <div class="spinner-border" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-2">멋진 명함을 생성 중입니다...</p>
+                        </div>
+
+                        <div class="result-section" id="resultSection">
+                            <hr class="my-5">
+                            <h3 class="text-center mb-4">완성!</h3>
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <img id="cardPreview" class="card-preview" alt="생성된 명함">
+                                    <p class="text-center mt-2 text-muted" id="templateInto"></p>
+                                </div>
+                                <div class="col-md-4 text-center">
+                                    <h5>QR코드로 저장하기</h5>
+                                    <img id="qrCode" class="qr-code" alt="QR 코드">
+                                    <p class="mt-2 small text-muted">휴대폰으로 QR코드를 스캔하면<br>명함 이미지를 저장할 수 있어요!</p>
+                                    <button type="button" class="btn btn-outline-primary mt-2" oneclick="generateNewCard()">다시 뽑기</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.getElementById('cardForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            generateCard();
+        });
+
+        function generateCard() {
+            const formData = {
+                name: document.getElementById('name').value,
+                school: document.getElementById('school').value,
+                phone: document.getElementById('phone').value,
+                favorite_color: document.getElementById('favoriteColor').value,
+            };
+
+            document.querySelector('.loading').style.display = 'block';
+            document.getElementById('resultSection').style.display = 'none';
+
+            fetch('/generate/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(formData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.querySelector('.loading').style.display = 'none';
+
+                if (data.success) {
+                    document.getElementById('cardPreview').src = data.card_url;
+                    document.getElementById('qrCode').src = data.qr_url;
+                    document.getElementById('templateInfo').textContent = `${data.template} 템플릿으로 생성되었습니다`;
+                    document.getElementById('resultSection').style.display = 'block';
+                } else {
+                    alert('명함 생성에 실패하였습니다: ' + data.error);
+                }
+            })
+            .catch(error => {
+                document.querySelector('.loading').style.display = 'none';
+                alert('오류가 발생하였습니다: ' + error);
+            });
+        }
+
+        function generateNewCard() {
+            generateCard();
+        }
+    </script>
+</body>
+</html>
