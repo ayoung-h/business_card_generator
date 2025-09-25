@@ -117,14 +117,43 @@ def draw_modern_template(draw, width, height, colors, user_data, layout): #모�
     draw.text((100, 220), user_data['school'], fill=colors['dark'], font=font_medium)
     draw.text((100, 280), user_data['phone'], fill=colors['dark'], font=font_small)
 
+def draw_heart(draw, x, y, size, fill): #하트 그리기(큐트 템플릿 사용)
+    w = size
+    h = size
+
+    draw.ellipse([x - w*0.25, y, x, y + h*0.25], fill=fill)
+    draw.ellipse([x, y, x + w*0.25, y + h*0.25], fill=fill)
+
+    v_height = h *0.6
+    draw.polygon([(x - w*0.25, y + h*0.125), (x + w*0.25, y + h*0.125), (x, y + v_height)], fill=fill)
+
+#하트 색상 팔레트
+PASTEL_PALETTE = [
+    (255, 179, 186),
+    (255, 223, 186),
+    (255, 255, 186),
+    (186, 255, 201),
+    (186, 225, 255),
+    (219, 186, 255),
+]
+
+def pick_matching_pastel(bg_color): # 하트 색상 선택
+    brightness = 0.299*bg_color[0] + 0.587*bg_color[1] + 0.114*bg_color[2]
+    if brightness < 128:
+        return random.choice(PASTEL_PALETTE[:3])
+    else:
+        return random.choice(PASTEL_PALETTE[3:])
+
 def draw_cute_template(draw, width, height, colors, user_data, layout): #큐트 템플릿
     pastel_color = tuple(min(255, c+50) for c in colors['primary'])
     draw.rectangle([0, 0, width, height], fill=pastel_color)
-
-    for i in range(5):
-        x = random.randint(50, width-100)
-        y = random.randint(50, height-100)
-        draw.ellipse([x, y, x+30, y+30], fill=colors['accent'])
+    
+    heart_color = pick_matching_pastel(pastel_color)
+    for i in range(10):
+        size = random.randint(20, 50)
+        x = random.randint(60, width-60)
+        y = random.randint(60, height-120)
+        draw_heart(draw, x, y, size, fill=heart_color)
 
     draw.rounded_rectangle([40, 40, width-40, height-40], radius=20, outline=colors['primary'], width=4)
     
