@@ -48,10 +48,9 @@ def generate_color_palette(base_color_hex, theme): #기본 색상 바탕 팔레�
         'primary': base_rgb,
         'secondary': hsl_to_rgb((h_secondary, l, s)),
         'accent': hsl_to_rgb((h, min(l + 0.2, 1), s)),
-        'light': hsl_to_rgb((h, min(l + 0.4, 1), max(s - 0.3, 0))),
-        'dark': hsl_to_rgb((h, max(l - 0.3, 0), s)),
+        'light': hsl_to_rgb((h, 0.95, 0.1)),
+        'dark': hsl_to_rgb((h, 0.1, s)),
         }
-    
     return colors
 
 def get_font_path():
@@ -130,12 +129,9 @@ def create_business_card(user_data): #명함 이미지 생성
     return img, template
 
 def draw_modern_template(draw, width, height, colors, user_data, layout): #모던 템플릿
-    for y in range(height):
-        alpha = y / height
-        color = tuple(int(colors['primary'][i] * (1 - alpha) + colors['secondary'][i] * alpha) for i in range(3))
-        draw.line([(0, y), (width, y)], fill=color)
-
-    draw.rectangle([50, 50, width-50, height-50], outline=colors['accent'], width=3)
+    draw.rectangle([0, 0, width, height], fill=colors['light'])
+    draw.rectangle([0, 0, width // 4, height], fill=colors['primary'])
+    draw.line([(width // 4, 0), (width // 4, height)], fill=colors['accent'], width=3)
 
     font_large = get_font(48, 'bold')
     font_medium = get_font(32, 'regular')
@@ -155,13 +151,15 @@ def draw_modern_template(draw, width, height, colors, user_data, layout): #모�
         phone_width = font_small.getlength(phone_text)
 
     if layout == 'center':
-        name_x = (width - name_width) // 2
-        school_x = (width - school_width) // 2
-        phone_x = (width - phone_width) // 2
+        text_area_start = width // 4
+        text_area_width = width - text_area_start
+        name_x = text_area_start + (text_area_width - name_width) // 2
+        school_x = text_area_start + (text_area_width - school_width) // 2
+        phone_x = text_area_start + (text_area_width - phone_width) // 2
     else:
-        name_x = 100
-        school_x = 100
-        phone_x = 100
+        name_x = (width // 4) + 100
+        school_x = (width // 4) + 100
+        phone_x = (width // 4) + 100
 
     name_y = 150
     school_y = 220
@@ -171,43 +169,35 @@ def draw_modern_template(draw, width, height, colors, user_data, layout): #모�
     draw.text((school_x, school_y), school_text, fill=colors['dark'], font=font_medium)
     draw.text((phone_x, phone_y), phone_text, fill=colors['dark'], font=font_small)
 
-def draw_heart(draw, x, y, size, fill): #하트 그리기(큐트 템플릿 사용)
-    w = size
-    h = size
+def draw_cute_sparkle(draw, x, y, size, fill):
+    half_size = size // 2
+    draw.line([(x - half_size, y), (x + half_size, y)], fill=fill, width=2)
+    draw.line([(x, y - half_size), (x, y + half_size)], fill=fill, width=2)
+    if random.random() < 0.3:
+        diag_size = half_size // 2
+        draw.line([(x - diag_size, y - diag_size), (x + diag_size, y + diag_size)], fill=fill, width=1)
+        draw.line([(x + diag_size, y - diag_size), (x - diag_size, y + diag_size)], fill=fill, width=1)
 
-    draw.ellipse([x - w*0.25, y, x, y + h*0.25], fill=fill)
-    draw.ellipse([x, y, x + w*0.25, y + h*0.25], fill=fill)
-
-    v_height = h *0.6
-    draw.polygon([(x - w*0.25, y + h*0.125), (x + w*0.25, y + h*0.125), (x, y + v_height)], fill=fill)
-
-#하트 색상 팔레트
-PASTEL_PALETTE = [
-    (255, 179, 186),
-    (255, 223, 186),
-    (255, 255, 186),
-    (186, 255, 201),
-    (186, 225, 255),
-    (219, 186, 255),
-]
-
-def pick_matching_pastel(bg_color): # 하트 색상 선택
-    brightness = 0.299*bg_color[0] + 0.587*bg_color[1] + 0.114*bg_color[2]
-    if brightness < 128:
-        return random.choice(PASTEL_PALETTE[:3])
-    else:
-        return random.choice(PASTEL_PALETTE[3:])
+def draw_polka_dot(draw, x, y, size, fill):
+    radius = size // 2
+    draw.ellipse([x - radius, y -radius, x + radius, y + radius], fill=fill)
 
 def draw_cute_template(draw, width, height, colors, user_data, layout): #큐트 템플릿
-    pastel_color = tuple(min(255, c+50) for c in colors['primary'])
-    draw.rectangle([0, 0, width, height], fill=pastel_color)
-    
-    heart_color = pick_matching_pastel(pastel_color)
-    for i in range(10):
-        size = random.randint(20, 50)
-        x = random.randint(60, width-60)
-        y = random.randint(60, height-120)
-        draw_heart(draw, x, y, size, fill=heart_color)
+    pastel_bg = random.choice([colors['light'], tuple(min(255, c+50) for c in colors['primary'])])
+    draw.rectangle([0, 0, width, height], fill=pastel_bg)
+    pattern_color_1 = colors['accent']
+    pattern_color_2 = colors['secondary']
+    for i in range(25):
+        x = random.randint(30, width - 30)
+        y = random.randint(30, height - 30)
+        size = random.randint(10, 25)
+
+        if random.random() < 0.6:
+            fill_color = random.choice([pattern_color_1, pattern_color_2, (255, 255, 255)])
+            draw_polka_dot(draw, x, y, size, fill_color)
+        else:
+            fill_color = random.choice([pattern_color_1, (255, 255, 255)])
+            draw_cute_sparkle(draw, x, y, size, fill_color)
 
     draw.rounded_rectangle([40, 40, width-40, height-40], radius=20, outline=colors['primary'], width=4)
     
@@ -243,7 +233,13 @@ def draw_cute_template(draw, width, height, colors, user_data, layout): #큐트 
 def draw_retro_template(draw, width, height, colors, user_data, layout): #레트로 템플릿
     retro_bg = (245, 222, 179)
     draw.rectangle([0, 0, width, height], fill=retro_bg)
-
+    grid_color = colors['secondary']
+    for i in range(0, width, 30):
+        draw.line([(i, 0), (i, height)], fill=grid_color, width=1)
+    for i in range(0, height, 30):
+        draw.line([(0, i), (width, i)], fill=grid_color, width=1)
+    draw.polygon([(width - 200, height), (width, height - 200), (width, height)], fill=colors['primary'])
+    draw.polygon([(width - 150, height), (width, height - 150), (width, height)], fill=colors['accent'])
     for i in range(5):
         draw.rectangle([10+i*2, 10+i*2, width-10-i*2, height-10-i*2], outline=colors['primary'], width=2)
 
@@ -309,18 +305,39 @@ def draw_neon_template(draw, width, height, colors, user_data, layout): #네온 
     school_y = 220
     phone_y = 280
 
-    draw.text((name_x, name_y), name_text, fill=(255, 255, 255), font=font_large)
+    glow_color = colors['accent']
+    main_color = (255, 255, 255)
+
+    offsets = [-2, 2, -3, 3]
+    for offset in offsets:
+        draw.text((name_x + offset, name_y), name_text, fill=glow_color, font=font_large)
+        draw.text((name_x, name_y + offset), name_text, fill=glow_color, font=font_large)
+
+    draw.text((name_x - 1, name_y), name_text, fill=main_color, font=font_large)
+    draw.text((name_x + 1, name_y), name_text, fill=main_color, font=font_large)
+    draw.text((name_x, name_y - 1), name_text, fill=main_color, font=font_large)
+    draw.text((name_x, name_y + 1), name_text, fill=main_color, font=font_large)
+
+    draw.text((name_x, name_y), name_text, fill=main_color, font=font_large)
     draw.text((school_x, school_y), school_text, fill=colors['accent'], font=font_medium)
     draw.text((phone_x, phone_y), phone_text, fill=colors['secondary'], font=font_small)
 
 def draw_galaxy_template(draw, width, height, colors, user_data, layout): #갤럭시 템플릿
     draw.rectangle([0, 0, width, height], fill=(10, 10, 30))
+    nebula_color_1 = tuple(c // 2 for c in colors['accent'])
+    nebula_color_2 = tuple(c // 2 for c in colors['secondary'])
+    draw.ellipse([width // 4, height // 4, width, height], fill=nebula_color_1)
+    draw.ellipse([-width // 2, -height // 4, width // 2, height], fill=nebula_color_2)
 
-    for i in range(50):
+    for i in range(150):
         x = random.randint(0, width)
         y = random.randint(0, height)
+        size = random.choice([1] * 80 + [2] * 15 + [3] * 5)
         brightness = random.randint(100, 255)
-        draw.point((x, y), fill=(brightness, brightness, brightness))
+        if size == 1:
+            draw.point((x, y), fill=(brightness, brightness, brightness))
+        else:
+            draw.ellipse([x, y, x + size, y + size], fill=(brightness, brightness, brightness))
 
     font_large = get_font(48, 'bold')
     font_medium = get_font(34, 'regular')
@@ -354,8 +371,8 @@ def draw_galaxy_template(draw, width, height, colors, user_data, layout): #갤�
 def draw_minimalist_template(draw, width, height, colors, user_data, layout): #미니멀 템플릿
     draw.rectangle([0, 0, width, height], fill=(255, 255, 255))
 
-    draw.line([(100, 140), (width-100, 140)], fill=colors['primary'], width=2)
-    draw.line([(100, height-100), (width-100, height-100)], fill=colors['primary'], width=2)
+    draw.line([(100, 140), (width-300, 140)], fill=colors['primary'], width=2)
+    draw.line([(300, height-100), (width-100, height-100)], fill=colors['primary'], width=2)
 
     font_large = get_font(42, 'bold')
     font_medium = get_font(28, 'regular')
@@ -363,29 +380,27 @@ def draw_minimalist_template(draw, width, height, colors, user_data, layout): #�
 
     name_text = user_data['name']
     school_text = user_data['school']
-    phone_text = user_data['phone']
 
-    name_width = draw.textbbox((0,0), name_text, font = font_large)[2]
-    school_width = draw.textbbox((0,0), school_text, font = font_medium)[2]
-    phone_width = draw.textbbox((0,0), phone_text, font = font_small)[2]
-
-    if layout == 'center':
-        name_x = (width - name_width) // 2
-        school_x = (width - school_width) // 2
-        phone_x = (width - phone_width) // 2
-    else:
-        name_x = 120
-        school_x = 120
-        phone_x = 120
-
+    name_x = 120
     name_y = 180
+    school_x = 120
     school_y = 240
-    phone_y = 300
 
     draw.text((name_x, name_y), name_text, fill=(50, 50, 50), font=font_large)
     draw.text((school_x, school_y), school_text, fill=(100, 100, 100), font=font_medium)
-    draw.text((phone_x, phone_y), phone_text, fill=(150, 150, 150), font=font_small)
 
+    phone_text = user_data['phone']
+    try:
+        phone_width = draw.textbbox((0, 0), phone_text, font_small)[2]
+    except AttributeError:
+        phone_width = font_small.getlength(phone_text)
+
+    phone_x = width - phone_width - 120
+    phone_y = height - 100 - 40
+
+    draw.text((phone_x, phone_y), phone_text, fill=(100, 100, 100), font=font_small)
+
+    
 def draw_grunge_template(draw, width, height, colors, user_data, layout): #그런지 템플릿
     base_color = tuple(max(0, c-30) for c in colors['primary'])
     draw.rectangle([0, 0, width, height], fill=base_color)
@@ -397,7 +412,7 @@ def draw_grunge_template(draw, width, height, colors, user_data, layout): #그�
         x, y = random.randint(0, width), random.randint(0, height)
         size = random.randint(1, 5)
         fill_color = random.choice([base_color] * 3 + [accent_rgb] * 5 + [secondary_rgb] * 2)
-        draw.ellipse([x, y, x+size, y+size], fil=fill_color)
+        draw.ellipse([x, y, x+size, y+size], fill=fill_color)
 
     for i in range(20):
         x1, y1 = random.randint(0, width), random.randint(0, height)
