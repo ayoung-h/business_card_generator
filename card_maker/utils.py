@@ -13,10 +13,6 @@ COLOR_THEMES = [
     'monochrome', 'gradient', 'complementary', 'pastel', 'vibrant'
 ]
 
-LAYOUTS = [
-    'center', 'left_align', 'diagonal', 'corner'
-]
-
 def hex_to_rgb(hex_color): #HEX 색상 RGB 변환
     hex_color = hex_color.lstrip('#')
     return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
@@ -58,21 +54,30 @@ def get_font_path():
     return {
         'regular': os.path.join(font_dir, 'NanumGothic.ttf'),
         'bold': os.path.join(font_dir, 'NanumGothicBold.ttf'),
-        'extrabold': os.path.join(font_dir, 'NanumGothicExtraBold.ttf')
+        'extrabold': os.path.join(font_dir, 'NanumGothicExtraBold.ttf'),
+        'retro' : os.path.join(font_dir, 'BoldDunggeunmo.ttf'),
+        'cute' : os.path.join(font_dir, 'Cutefont.ttf'),
+        'grunge' : os.path.join(font_dir, 'BlackHanSans-Regular.ttf'),
     }
 
-def get_font(size, weight='regular'):
+def get_font(size, weight='regular', font_name=None):
     font_paths = get_font_path()
+    font_to_use = None
+
+    if font_name and font_name in font_paths:
+        font_to_use = font_paths[font_name]
+    elif weight == 'bold' and os.path.exists(font_paths['bold']):
+        font_to_use = font_paths['bold']
+    elif weight == 'extrabold' and os.path.exists(font_paths['extrabold']):
+        font_to_use = font_paths['extrabold']
+    elif os.path.exists(font_paths['regular']):
+        font_to_use = font_paths['regular']
 
     try:
-        if weight == 'bold' and os.path.exists(font_paths['bold']):
-            return ImageFont.truetype(font_paths['bold'], size)
-        elif weight == 'extrabold' and os.path.exists(font_paths['extrabold']):
-            return ImageFont.truetype(font_paths['extrabold'], size)
-        elif os.path.exists(font_paths['regular']):
-            return ImageFont.truetype(font_paths['regular'], size)
+        if font_to_use and os.path.exists(font_to_use):
+            return ImageFont.truetype(font_to_use, size)
         else:
-            print(f"나눔고딕 폰트를 찾을 수 없습니다. 기본 폰트를 사용합니다.")
+            print(f"폰트 파일을 찾을 수 없습니다: {font_name} 또는 {weight}")
             return ImageFont.load_default()
     except Exception as e:
         print(f"폰트 로드 오류: {e}")
@@ -136,38 +141,30 @@ def draw_modern_template(draw, width, height, colors, user_data, layout): #모�
     font_large = get_font(48, 'bold')
     font_medium = get_font(32, 'regular')
     font_small = get_font(24, 'regular')
+    text_color = colors['dark']
 
     name_text = user_data['name']
     school_text = user_data['school']
     phone_text = user_data['phone']
 
     try:
-        name_width = draw.textbbox((0,0), name_text, font=font_large)[2]
-        school_width = draw.textbbox((0,0), school_text, font=font_medium)[2]
         phone_width = draw.textbbox((0,0), phone_text, font=font_small)[2]
     except AttributeError:
-        name_width = font_large.getlength(name_text)
-        school_width = font_medium.getlength(school_text)
         phone_width = font_small.getlength(phone_text)
 
-    if layout == 'center':
-        text_area_start = width // 4
-        text_area_width = width - text_area_start
-        name_x = text_area_start + (text_area_width - name_width) // 2
-        school_x = text_area_start + (text_area_width - school_width) // 2
-        phone_x = text_area_start + (text_area_width - phone_width) // 2
-    else:
-        name_x = (width // 4) + 100
-        school_x = (width // 4) + 100
-        phone_x = (width // 4) + 100
-
+    base_x = (width // 4) + 100
+    name_x = base_x
     name_y = 150
+    school_x = base_x
     school_y = 220
-    phone_y = 280
 
-    draw.text((name_x, name_y), name_text, fill=colors['dark'], font=font_large)
-    draw.text((school_x, school_y), school_text, fill=colors['dark'], font=font_medium)
-    draw.text((phone_x, phone_y), phone_text, fill=colors['dark'], font=font_small)
+    draw.text((name_x, name_y), name_text, fill=text_color, font=font_large)
+    draw.text((school_x, school_y), school_text, fill=text_color, font=font_medium)
+
+    phone_x = width - phone_width - 100
+    phone_y = height - 100
+
+    draw.text((phone_x, phone_y), phone_text, fill=text_color, font=font_small)
 
 def draw_cute_sparkle(draw, x, y, size, fill):
     half_size = size // 2
@@ -201,9 +198,10 @@ def draw_cute_template(draw, width, height, colors, user_data, layout): #큐트 
 
     draw.rounded_rectangle([40, 40, width-40, height-40], radius=20, outline=colors['primary'], width=4)
     
-    font_large = get_font(42, 'bold')
-    font_medium = get_font(28, 'regular')
-    font_small = get_font(22, 'regular')
+    font_large = get_font(42, 'bold', font_name='cute')
+    font_medium = get_font(28, 'regular', font_name='cute')
+    font_small = get_font(22, 'regular', font_name='cute')
+    text_color = colors['dark']
 
     name_text = user_data['name']
     school_text = user_data['school']
@@ -213,27 +211,23 @@ def draw_cute_template(draw, width, height, colors, user_data, layout): #큐트 
     school_width = draw.textbbox((0,0), school_text, font = font_medium)[2]
     phone_width = draw.textbbox((0,0), phone_text, font = font_small)[2]
 
-    if layout == 'center':
-        name_x = (width - name_width) // 2
-        school_x = (width - school_width) // 2
-        phone_x = (width - phone_width) // 2
-    else:
-        name_x = 100
-        school_x = 100
-        phone_x = 100
-
+    name_x = (width - name_width) // 2
     name_y = 180
+    school_x = (width - school_width) // 2
     school_y = 240
-    phone_y = 300
 
-    draw.text((name_x, name_y), name_text, fill=colors['dark'], font=font_large)
-    draw.text((school_x, school_y), school_text, fill=colors['dark'], font=font_medium)
-    draw.text((phone_x, phone_y), phone_text, fill=colors['dark'], font=font_small)
+    draw.text((name_x, name_y), name_text, fill=text_color, font=font_large)
+    draw.text((school_x, school_y), school_text, fill=text_color, font=font_medium)
+
+    phone_x = (width - phone_width) // 2
+    phone_y = height - 100
+
+    draw.text((phone_x, phone_y), phone_text, fill=text_color, font=font_small)
 
 def draw_retro_template(draw, width, height, colors, user_data, layout): #레트로 템플릿
     retro_bg = (245, 222, 179)
     draw.rectangle([0, 0, width, height], fill=retro_bg)
-    grid_color = colors['secondary']
+    grid_color = tuple(c - 15 for c in retro_bg)
     for i in range(0, width, 30):
         draw.line([(i, 0), (i, height)], fill=grid_color, width=1)
     for i in range(0, height, 30):
@@ -243,41 +237,35 @@ def draw_retro_template(draw, width, height, colors, user_data, layout): #레트
     for i in range(5):
         draw.rectangle([10+i*2, 10+i*2, width-10-i*2, height-10-i*2], outline=colors['primary'], width=2)
 
-    font_large = get_font(44, 'bold')
-    font_medium = get_font(30, 'regular')
-    font_small = get_font(26, 'regular')
+    font_large = get_font(44, 'bold', font_name='retro')
+    font_medium = get_font(30, 'regular', font_name='retro')
+    font_small = get_font(26, 'regular', font_name='retro')
+    text_color = colors['dark']
 
     name_text = user_data['name']
     school_text = user_data['school']
     phone_text = user_data['phone']
 
-    name_width = draw.textbbox((0,0), name_text, font = font_large)[2]
-    school_width = draw.textbbox((0,0), school_text, font = font_medium)[2]
-    phone_width = draw.textbbox((0,0), phone_text, font = font_small)[2]
+    phone_width = draw.textbbox((0,0), school_text, font = font_medium)[2]
 
-    if layout == 'center':
-        name_x = (width - name_width) // 2
-        school_x = (width - school_width) // 2
-        phone_x = (width - phone_width) // 2
-    else:
-        name_x = 120
-        school_x = 120
-        phone_x = 120
-
+    name_x = 120
     name_y = 160
+    school_x = 120
     school_y = 220
-    phone_y = 280
 
-    draw.text((name_x, name_y), name_text, fill=colors['dark'], font=font_large)
-    draw.text((school_x, school_y), school_text, fill=colors['dark'], font=font_medium)
-    draw.text((phone_x, phone_y), phone_text, fill=colors['dark'], font=font_small)
+    draw.text((name_x, name_y), name_text, fill=text_color, font=font_large)
+    draw.text((school_x, school_y), school_text, fill=text_color, font=font_medium)
+
+    phone_x = width - phone_width - 120
+    phone_y = height - 80
+
+    draw.text((phone_x, phone_y), phone_text, fill=text_color, font=font_small)
 
 def draw_neon_template(draw, width, height, colors, user_data, layout): #네온 템플릿
     draw.rectangle([0, 0, width, height], fill=(20, 20, 20))
 
     neon_color = colors['primary']
     for thickness in range(8, 0, -1):
-        alpha = 255 - thickness * 20
         draw.rectangle([60-thickness, 60-thickness, width-60+thickness, height-60+thickness], outline=neon_color, width=thickness)
 
     font_large = get_font(46, 'bold')
@@ -292,18 +280,8 @@ def draw_neon_template(draw, width, height, colors, user_data, layout): #네온 
     school_width = draw.textbbox((0,0), school_text, font = font_medium)[2]
     phone_width = draw.textbbox((0,0), phone_text, font = font_small)[2]
 
-    if layout == 'center':
-        name_x = (width - name_width) // 2
-        school_x = (width - school_width) // 2
-        phone_x = (width - phone_width) // 2
-    else:
-        name_x = 100
-        school_x = 100
-        phone_x = 100
-
+    name_x = (width - name_width) // 2
     name_y = 150
-    school_y = 220
-    phone_y = 280
 
     glow_color = colors['accent']
     main_color = (255, 255, 255)
@@ -313,31 +291,28 @@ def draw_neon_template(draw, width, height, colors, user_data, layout): #네온 
         draw.text((name_x + offset, name_y), name_text, fill=glow_color, font=font_large)
         draw.text((name_x, name_y + offset), name_text, fill=glow_color, font=font_large)
 
-    draw.text((name_x - 1, name_y), name_text, fill=main_color, font=font_large)
-    draw.text((name_x + 1, name_y), name_text, fill=main_color, font=font_large)
-    draw.text((name_x, name_y - 1), name_text, fill=main_color, font=font_large)
-    draw.text((name_x, name_y + 1), name_text, fill=main_color, font=font_large)
-
     draw.text((name_x, name_y), name_text, fill=main_color, font=font_large)
+
+    school_x = (width - school_width) // 2
+    school_y = height - 120
+    phone_x = (width - phone_width) // 2
+    phone_y = height - 80
+
     draw.text((school_x, school_y), school_text, fill=colors['accent'], font=font_medium)
     draw.text((phone_x, phone_y), phone_text, fill=colors['secondary'], font=font_small)
 
 def draw_galaxy_template(draw, width, height, colors, user_data, layout): #갤럭시 템플릿
-    draw.rectangle([0, 0, width, height], fill=(10, 10, 30))
-    nebula_color_1 = tuple(c // 2 for c in colors['accent'])
-    nebula_color_2 = tuple(c // 2 for c in colors['secondary'])
-    draw.ellipse([width // 4, height // 4, width, height], fill=nebula_color_1)
-    draw.ellipse([-width // 2, -height // 4, width // 2, height], fill=nebula_color_2)
+    draw.rectangle([0, 0, width, height], fill=(5, 5, 15))
+    nebula_color_1 = tuple(c // 4 for c in colors['accent'])
+    nebula_color_2 = tuple(c // 4 for c in colors['secondary'])
+    draw.ellipse([-width // 4, -height // 4, width // 2, height // 2], fill=nebula_color_1)
+    draw.ellipse([width // 4, height // 2, width + width // 4, height + height // 2], fill=nebula_color_2)
 
-    for i in range(150):
+    for i in range(100):
         x = random.randint(0, width)
         y = random.randint(0, height)
-        size = random.choice([1] * 80 + [2] * 15 + [3] * 5)
-        brightness = random.randint(100, 255)
-        if size == 1:
-            draw.point((x, y), fill=(brightness, brightness, brightness))
-        else:
-            draw.ellipse([x, y, x + size, y + size], fill=(brightness, brightness, brightness))
+        brightness = random.randint(150, 255)
+        draw.point((x, y), fill=(brightness, brightness, brightness))
 
     font_large = get_font(48, 'bold')
     font_medium = get_font(34, 'regular')
@@ -347,25 +322,19 @@ def draw_galaxy_template(draw, width, height, colors, user_data, layout): #갤�
     school_text = user_data['school']
     phone_text = user_data['phone']
 
-    name_width = draw.textbbox((0,0), name_text, font = font_large)[2]
-    school_width = draw.textbbox((0,0), school_text, font = font_medium)[2]
     phone_width = draw.textbbox((0,0), phone_text, font = font_small)[2]
 
-    if layout == 'center':
-        name_x = (width - name_width) // 2
-        school_x = (width - school_width) // 2
-        phone_x = (width - phone_width) // 2
-    else:
-        name_x = 110
-        school_x = 110
-        phone_x = 110
-
+    name_x = 110
     name_y = 150
+    school_x = 110
     school_y = 220
-    phone_y = 280
 
-    draw.text((name_x, name_y), name_text, fill=colors['accent'], font=font_large)
+    draw.text((name_x, name_y), name_text, fill=(255, 255, 255), font=font_large)
     draw.text((school_x, school_y), school_text, fill=(200, 200, 255), font=font_medium)
+
+    phone_x = width - phone_width - 110
+    phone_y = height - 100
+
     draw.text((phone_x, phone_y), phone_text, fill=(255, 255, 200), font=font_small)
 
 def draw_minimalist_template(draw, width, height, colors, user_data, layout): #미니멀 템플릿
@@ -380,6 +349,7 @@ def draw_minimalist_template(draw, width, height, colors, user_data, layout): #�
 
     name_text = user_data['name']
     school_text = user_data['school']
+    phone_text = user_data['phone']
 
     name_x = 120
     name_y = 180
@@ -389,7 +359,6 @@ def draw_minimalist_template(draw, width, height, colors, user_data, layout): #�
     draw.text((name_x, name_y), name_text, fill=(50, 50, 50), font=font_large)
     draw.text((school_x, school_y), school_text, fill=(100, 100, 100), font=font_medium)
 
-    phone_text = user_data['phone']
     try:
         phone_width = draw.textbbox((0, 0), phone_text, font_small)[2]
     except AttributeError:
@@ -399,7 +368,6 @@ def draw_minimalist_template(draw, width, height, colors, user_data, layout): #�
     phone_y = height - 100 - 40
 
     draw.text((phone_x, phone_y), phone_text, fill=(100, 100, 100), font=font_small)
-
     
 def draw_grunge_template(draw, width, height, colors, user_data, layout): #그런지 템플릿
     base_color = tuple(max(0, c-30) for c in colors['primary'])
@@ -419,34 +387,29 @@ def draw_grunge_template(draw, width, height, colors, user_data, layout): #그�
         x2, y2 = random.randint(0, width), random.randint(0, height)
         draw.line([(x1, y1), (x2, y2)], fill=colors['accent'], width=random.randint(1,3))
 
-    font_large = get_font(44, 'bold')
-    font_medium = get_font(30, 'regular')
-    font_small = get_font(26, 'regular')
+    font_large = get_font(44, 'bold', font_name='grunge')
+    font_medium = get_font(30, 'regular', font_name='grunge')
+    font_small = get_font(26, 'regular', font_name='grunge')
+    text_color = colors['light']
 
     name_text = user_data['name']
     school_text = user_data['school']
     phone_text = user_data['phone']
 
-    name_width = draw.textbbox((0,0), name_text, font = font_large)[2]
-    school_width = draw.textbbox((0,0), school_text, font = font_medium)[2]
     phone_width = draw.textbbox((0,0), phone_text, font = font_small)[2]
 
-    if layout == 'center':
-        name_x = (width - name_width) // 2
-        school_x = (width - school_width) // 2
-        phone_x = (width - phone_width) // 2
-    else:
-        name_x = 100
-        school_x = 100
-        phone_x = 100
-
+    name_x = 100
     name_y = 160
+    school_x = 100
     school_y = 220
-    phone_y = 280
 
-    draw.text((name_x, name_y), name_text, fill=colors['light'], font=font_large)
-    draw.text((school_x, school_y), school_text, fill=colors['light'], font=font_medium)
-    draw.text((phone_x, phone_y), phone_text, fill=colors['light'], font=font_small)
+    draw.text((name_x, name_y), name_text, fill=text_color, font=font_large)
+    draw.text((school_x, school_y), school_text, fill=text_color, font=font_medium)
+
+    phone_x = width - phone_width - 100
+    phone_y = height - 100
+
+    draw.text((phone_x, phone_y), phone_text, fill=text_color, font=font_small)
 
 def generate_qr_code(download_url): #QR코드 생성
     qr = qrcode.QRCode(
