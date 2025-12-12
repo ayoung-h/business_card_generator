@@ -5,13 +5,18 @@ from django.conf import settings
 import json
 import os
 import uuid
-from .utils import create_business_card, generate_qr_code
+from .utils import create_business_card, generate_qr_code, USER_STYLES
 
-def index(request): #메인페이지
-    return render(request, 'card_maker/index.html')
+def index(request):
+    """메인페이지 - 스타일 선택지 포함"""
+    context = {
+        'user_styles': USER_STYLES
+    }
+    return render(request, 'card_maker/index.html', context)
 
 @csrf_exempt
-def generate_card(request): #명함 생성
+def generate_card(request):
+    """명함 생성 - 스타일 파라미터 지원"""
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
@@ -23,15 +28,20 @@ def generate_card(request): #명함 생성
                 'favorite_color': data.get('favorite_color', '#3498db'),
             }
 
-            card_img, template = create_business_card(user_data)
+            # 사용자가 선택한 스타일 (선택 안하면 None -> 랜덤)
+            style = data.get('style', None)
 
+            # 명함 생성
+            card_img, used_style = create_business_card(user_data, style=style)
+
+            # 파일명 생성 및 저장
             filename = f"card_{uuid.uuid4().hex[:8]}.png"
             filepath = os.path.join(settings.MEDIA_ROOT, 'cards', filename)
 
             os.makedirs(os.path.dirname(filepath), exist_ok=True)
-
             card_img.save(filepath)
 
+            # QR 코드 생성
             server_ip = request.get_host()
             download_url = f'http://{server_ip}/download/{filename}/'
             qr_img = generate_qr_code(download_url)
@@ -40,15 +50,32 @@ def generate_card(request): #명함 생성
             qr_filepath = os.path.join(settings.MEDIA_ROOT, 'qrcodes', qr_filename)
 
             os.makedirs(os.path.dirname(qr_filepath), exist_ok=True)
-
             qr_img.save(qr_filepath)
+
+            # 스타일 이름을 한글로 변환
+            style_names = {
+                'space': '우주',
+                'cute': '귀여운',
+                'neon': '네온',
+                'retro': '레트로',
+                'vintage': '빈티지',
+                'nature': '자연',
+                'engineering': '공학',
+                'art': '미술',
+                'sports': '스포츠',
+                'music': '음악',
+                'education': '교육',
+                'business': '비즈니스',
+                'medical': '의료'
+            }
 
             return JsonResponse({
                 'success': True,
                 'card_url': f'/media/cards/{filename}',
                 'qr_url': f'/media/qrcodes/{qr_filename}',
                 'download_url': download_url,
-                'template': template,
+                'style': used_style,
+                'style_name': style_names.get(used_style, used_style),
             })
         
         except Exception as e:
@@ -59,7 +86,8 @@ def generate_card(request): #명함 생성
         
     return JsonResponse({'success': False, 'error': 'POST method required'})
 
-def download_card(request, filename): #명함 다운로드
+def download_card(request, filename):
+    """명함 다운로드"""
     filepath = os.path.join(settings.MEDIA_ROOT, 'cards', filename)
 
     if not os.path.exists(filepath):
