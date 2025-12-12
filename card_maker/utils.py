@@ -1,91 +1,60 @@
-from PIL import Image, ImageDraw, ImageFont, ImageFilter
+from PIL import Image, ImageDraw, ImageFont
 import random
 import colorsys
 import os
 from django.conf import settings
 import qrcode
-import math
+import logging
 
-# ========== 사용자 선택 가능한 스타일 ==========
-USER_STYLES = [
-    'space',       # 우주 → galaxy 템플릿
-    'cute',        # 귀여운 → cute 템플릿
-    'neon',        # 네온 → neon 템플릿
-    'retro',       # 레트로 → retro 템플릿
-    'vintage',     # 빈티지 → grunge 템플릿
-    'nature',      # 자연 → 베이스 + 테마
-    'engineering', # 공학 → 베이스 + 테마
-    'art',         # 미술 → 베이스 + 테마
-    'sports',      # 스포츠 → 베이스 + 테마
-    'music',       # 음악 → 베이스 + 테마
-    'education',   # 교육 → 베이스 + 테마
-    'business',    # 비즈니스 → 베이스 + 테마
-    'medical'      # 의료 → 베이스 + 테마
+logger = logging.getLogger(__name__)
+
+TEMPLATES = [
+    'modern', 'cute', 'retro', 'neon', 'galaxy', 'minimalist', 'grunge'
 ]
 
-# 스타일 → 템플릿/테마 매핑
-STYLE_MAPPING = {
-    # 개성 템플릿 (고정 스타일)
-    'space': {'type': 'stylized', 'template': 'galaxy'},
-    'cute': {'type': 'stylized', 'template': 'cute'},
-    'neon': {'type': 'stylized', 'template': 'neon'},
-    'retro': {'type': 'stylized', 'template': 'retro'},
-    'vintage': {'type': 'stylized', 'template': 'grunge'},
-    
-    # 베이스 템플릿 + 테마
-    'nature': {'type': 'themed', 'theme': 'nature'},
-    'engineering': {'type': 'themed', 'theme': 'engineering'},
-    'art': {'type': 'themed', 'theme': 'art'},
-    'sports': {'type': 'themed', 'theme': 'sports'},
-    'music': {'type': 'themed', 'theme': 'music'},
-    'education': {'type': 'themed', 'theme': 'education'},
-    'business': {'type': 'themed', 'theme': 'business'},
-    'medical': {'type': 'themed', 'theme': 'medical'}
-}
-
-# 베이스 템플릿 목록
-BASE_TEMPLATES = ['modern', 'minimalist']
-
-# 테마별 색상 팔레트
-THEME_COLORS = {
-    'nature': '#4A7C59',      # 초록
-    'engineering': '#2C3E50',  # 진한 회색
-    'medical': '#E74C3C',      # 빨강
-    'art': '#9B59B6',          # 보라
-    'business': '#34495E',     # 네이비
-    'education': '#F39C12',    # 주황
-    'sports': '#16A085',       # 청록
-    'music': '#8E44AD'         # 자주
-}
-
-# ========== 유틸리티 함수 ==========
+COLOR_THEMES = [
+    'monochrome', 'gradient', 'complementary', 'pastel', 'vibrant'
+]
 
 def hex_to_rgb(hex_color):
-    hex_color = hex_color.lstrip('#')
-    return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+    """HEX 색상을 RGB로 변환"""
+    try:
+        hex_color = hex_color.lstrip('#')
+        if len(hex_color) != 6:
+            raise ValueError("Invalid hex color format")
+        return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+    except (ValueError, AttributeError) as e:
+        logger.error(f"색상 변환 오류: {hex_color}, {e}")
+        return (52, 152, 219)  # 기본 파란색
 
 def rgb_to_hsl(rgb):
+    """RGB를 HSL로 변환"""
     r, g, b = [x/255.0 for x in rgb]
-    h, l, s = colorsys.rgb_to_hls(r, g, b)
-    return (h, l, s)
+    return colorsys.rgb_to_hls(r, g, b)
 
 def hsl_to_rgb(hsl):
+    """HSL을 RGB로 변환"""
     h, l, s = hsl
     r, g, b = colorsys.hls_to_rgb(h, l, s)
     return tuple(int(x * 255) for x in (r, g, b))
 
-def generate_color_palette(base_color_hex, theme='complementary'):
+def generate_color_palette(base_color_hex, theme):
+    """기본 색상 바탕 팔레트 생성"""
     base_rgb = hex_to_rgb(base_color_hex)
     base_hsl = rgb_to_hsl(base_rgb)
     h, l, s = base_hsl
-    
-    if theme == 'complementary':
-        h_secondary = (h + 0.5) % 1
-    elif theme == 'monochrome':
-        h_secondary = h
-    else:
-        h_secondary = (h + 0.3) % 1
-    
+
+    # 테마별 보조 색상 생성
+    theme_offsets = {
+        'complementary': 0.5,
+        'monochrome': 0.0,
+        'gradient': 0.3,
+        'pastel': 0.25,
+        'vibrant': 0.4
+    }
+    h_offset = theme_offsets.get(theme, 0.3)
+    h_secondary = (h + h_offset) % 1
+
     colors = {
         'primary': base_rgb,
         'secondary': hsl_to_rgb((h_secondary, l, s)),
@@ -96,6 +65,7 @@ def generate_color_palette(base_color_hex, theme='complementary'):
     return colors
 
 def get_font_path():
+    """폰트 경로 반환"""
     font_dir = os.path.join(settings.BASE_DIR, 'static', 'fonts')
     return {
         'regular': os.path.join(font_dir, 'NanumGothic.ttf'),
@@ -104,642 +74,227 @@ def get_font_path():
         'retro': os.path.join(font_dir, 'BoldDunggeunmo.ttf'),
         'cute': os.path.join(font_dir, 'Cutefont.ttf'),
         'grunge': os.path.join(font_dir, 'BlackHanSans-Regular.ttf'),
+        'galaxy': os.path.join(font_dir, 'Hakgyoansim Byeolbichhaneul TTF B.ttf'),
+        'neon': os.path.join(font_dir, 'EliceDigitalBaeum_Regular.ttf'),
     }
 
 def get_font(size, weight='regular', font_name=None):
+    """폰트 객체 반환 (에러 처리 강화)"""
     font_paths = get_font_path()
-    font_to_use = None
-
+    
+    # 우선순위: font_name > weight > regular > default
+    candidates = []
     if font_name and font_name in font_paths:
-        font_to_use = font_paths[font_name]
-    elif weight == 'bold' and os.path.exists(font_paths.get('bold', '')):
-        font_to_use = font_paths['bold']
-    elif weight == 'extrabold' and os.path.exists(font_paths.get('extrabold', '')):
-        font_to_use = font_paths['extrabold']
-    elif os.path.exists(font_paths.get('regular', '')):
-        font_to_use = font_paths['regular']
+        candidates.append(font_paths[font_name])
+    if weight in font_paths:
+        candidates.append(font_paths[weight])
+    candidates.append(font_paths.get('regular'))
+    
+    for font_path in candidates:
+        if font_path and os.path.exists(font_path):
+            try:
+                return ImageFont.truetype(font_path, size)
+            except Exception as e:
+                logger.warning(f"폰트 로드 실패: {font_path}, {e}")
+                continue
+    
+    logger.error(f"모든 폰트 로드 실패. 기본 폰트 사용: size={size}")
+    return ImageFont.load_default()
 
+TEMPLATE_CONFIG = {
+    'modern': {
+        'fonts': {
+            'large': {'size': 48, 'weight': 'bold'},
+            'medium': {'size': 32, 'weight': 'regular'},
+            'small': {'size': 24, 'weight': 'regular'},
+        },
+        'colors': {
+            'name': 'dark', 'school': 'dark', 'phone': 'dark'
+        },
+        'layout': {
+            'name':   {'align': 'left', 'x': lambda w, h: 100, 'y': lambda w, h: 100},
+            'school': {'align': 'left', 'x': lambda w, h: 100, 'y': lambda w, h: 170},
+            'phone':  {'align': 'right', 'x': lambda w, h: w - 100, 'y': lambda w, h: h - 100}
+        }
+    },
+    'cute': {
+        'fonts': {
+            'large': {'size': 42, 'weight': 'bold', 'font_name': 'cute'},
+            'medium': {'size': 28, 'weight': 'regular', 'font_name': 'cute'},
+            'small': {'size': 22, 'weight': 'regular', 'font_name': 'cute'},
+        },
+        'colors': {
+            'name': 'dark', 'school': 'dark', 'phone': 'dark'
+        },
+        'layout': {
+            'name':   {'align': 'center', 'x': lambda w, h: w // 2, 'y': lambda w, h: 180},
+            'school': {'align': 'center', 'x': lambda w, h: w // 2, 'y': lambda w, h: 240},
+            'phone':  {'align': 'center', 'x': lambda w, h: w // 2, 'y': lambda w, h: h - 100}
+        }
+    },
+    'retro': {
+        'fonts': {
+            'large': {'size': 44, 'weight': 'bold', 'font_name': 'retro'},
+            'medium': {'size': 30, 'weight': 'regular', 'font_name': 'retro'},
+            'small': {'size': 26, 'weight': 'regular', 'font_name': 'retro'},
+        },
+        'colors': {
+            'name': 'dark', 'school': 'dark', 'phone': 'dark'
+        },
+        'layout': {
+            'name':   {'align': 'left', 'x': lambda w, h: 120, 'y': lambda w, h: 160},
+            'school': {'align': 'left', 'x': lambda w, h: 120, 'y': lambda w, h: 220},
+            'phone':  {'align': 'right', 'x': lambda w, h: w - 120, 'y': lambda w, h: h - 80}
+        }
+    },
+    'galaxy': {
+        'fonts': {
+            'large': {'size': 48, 'weight': 'bold', 'font_name': 'galaxy'},
+            'medium': {'size': 34, 'weight': 'regular', 'font_name': 'galaxy'},
+            'small': {'size': 30, 'weight': 'regular', 'font_name': 'galaxy'},
+        },
+        'colors': {
+            'name': (255, 255, 255),
+            'school': (200, 200, 255),
+            'phone': (255, 255, 200),
+        },
+        'layout': {
+            'name':   {'align': 'left', 'x': lambda w, h: 110, 'y': lambda w, h: 150},
+            'school': {'align': 'left', 'x': lambda w, h: 110, 'y': lambda w, h: 220},
+            'phone':  {'align': 'right', 'x': lambda w, h: w - 110, 'y': lambda w, h: h - 100}
+        }
+    },
+    'minimalist': {
+        'fonts': {
+            'large': {'size': 42, 'weight': 'bold'},
+            'medium': {'size': 28, 'weight': 'regular'},
+            'small': {'size': 24, 'weight': 'regular'},
+        },
+        'colors': {
+            'name': (50, 50, 50),
+            'school': (100, 100, 100),
+            'phone': (100, 100, 100),
+        },
+        'layout': {
+            'name':   {'align': 'center', 'x': lambda w, h: w // 2, 'y': lambda w, h: 150},
+            'school': {'align': 'center', 'x': lambda w, h: w // 2, 'y': lambda w, h: 210},
+            'phone':  {'align': 'center', 'x': lambda w, h: w // 2, 'y': lambda w, h: h - 100}
+        }
+    },
+    'neon': {
+        'fonts': {
+            'large': {'size': 46, 'weight': 'regular', 'font_name': 'neon'},
+            'medium': {'size': 32, 'weight': 'regular', 'font_name': 'neon'},
+            'small': {'size': 28, 'weight': 'regular', 'font_name': 'neon'},
+        },
+        'colors': {
+            'name': (255, 255, 255),
+            'school': 'light',
+            'phone': 'light',
+        },
+        'layout': {
+            'name':   {'align': 'center', 'x': lambda w, h: w // 2, 'y': lambda w, h: 150},
+            'school': {'align': 'center', 'x': lambda w, h: w // 2, 'y': lambda w, h: h - 150},
+            'phone':  {'align': 'center', 'x': lambda w, h: w // 2, 'y': lambda w, h: h - 110}
+        },
+    },
+    'grunge': {
+        'fonts': {
+            'large': {'size': 40, 'weight': 'bold', 'font_name': 'grunge'},
+            'medium': {'size': 26, 'weight': 'regular', 'font_name': 'grunge'},
+            'small': {'size': 20, 'weight': 'regular', 'font_name': 'grunge'},
+        },
+        'colors': {
+            'name': 'accent',
+            'school': 'light',
+            'phone': 'secondary'
+        },
+        'layout': {
+            'name': {'align': 'left', 'x': lambda w, h: 80, 'y': lambda w, h: 100},
+            'school': {'align': 'left', 'x': lambda w, h: 80, 'y': lambda w, h: 160},
+            'phone': {'align': 'left', 'x': lambda w, h: 80, 'y': lambda w, h: h - 100}
+        }
+    },
+}
+
+def get_text_width(draw, text, font):
+    """텍스트 너비 계산 (호환성 개선)"""
     try:
-        if font_to_use and os.path.exists(font_to_use):
-            return ImageFont.truetype(font_to_use, size)
-        else:
-            return ImageFont.load_default()
-    except Exception as e:
-        print(f"폰트 로드 오류: {e}")
-        return ImageFont.load_default()
-
-# ========== 테마 관련 함수 ==========
-
-def get_theme_images(theme):
-    """테마에 맞는 이미지 파일 경로 반환"""
-    image_dir = os.path.join(settings.BASE_DIR, 'static', 'theme_images', theme)
-    
-    theme_image_files = {
-        'nature': ['leaf.png', 'flower.png', 'mountain.png', 'tree.png'],
-        'engineering': ['gear.png', 'circuit.png', 'blueprint.png', 'tool.png'],
-        'medical': ['stethoscope.png', 'cross.png', 'heart.png', 'pill.png'],
-        'art': ['brush.png', 'palette.png', 'canvas.png', 'pencil.png'],
-        'business': ['document.png', 'chart.png', 'briefcase.png', 'handshake.png'],
-        'education': ['book.png', 'pencil.png', 'graduate.png', 'apple.png'],
-        'sports': ['ball.png', 'dumbbell.png', 'trophy.png', 'shoe.png'],
-        'music': ['guitar.png', 'note.png', 'mic.png', 'headphone.png']
-    }
-    
-    files = theme_image_files.get(theme, [])
-    return [os.path.join(image_dir, f) for f in files]
-
-def create_themed_background(width, height, theme, colors):
-    """테마에 맞는 배경 패턴 생성"""
-    img = Image.new('RGB', (width, height), colors['light'])
-    overlay = Image.new('RGBA', (width, height), (0, 0, 0, 0))
-    overlay_draw = ImageDraw.Draw(overlay)
-    
-    if theme == 'nature':
-        # 자연스러운 물결 패턴
-        for i in range(5):
-            y_offset = i * 100
-            points = []
-            for x in range(0, width + 50, 50):
-                y = y_offset + math.sin(x / 100) * 30
-                points.append((x, y))
-            if len(points) > 1:
-                overlay_draw.line(points, fill=colors['accent'] + (30,), width=2)
-        
-        # 원형 패턴
-        for i in range(15):
-            x = random.randint(-50, width + 50)
-            y = random.randint(-50, height + 50)
-            size = random.randint(30, 80)
-            overlay_draw.ellipse([x, y, x + size, y + size], fill=colors['secondary'] + (20,))
-    
-    elif theme == 'engineering':
-        # 격자 패턴
-        grid_color = colors['primary'] + (15,)
-        for i in range(0, width, 40):
-            overlay_draw.line([(i, 0), (i, height)], fill=grid_color, width=1)
-        for i in range(0, height, 40):
-            overlay_draw.line([(0, i), (width, i)], fill=grid_color, width=1)
-        
-        # 기하학적 도형
-        for i in range(8):
-            x = random.randint(0, width)
-            y = random.randint(0, height)
-            size = random.randint(40, 100)
-            overlay_draw.rectangle([x, y, x + size, y + size], 
-                                  outline=colors['accent'] + (40,), width=2)
-    
-    elif theme == 'medical':
-        # 십자가 패턴
-        cross_color = colors['primary'] + (20,)
-        for i in range(10):
-            x = random.randint(50, width - 50)
-            y = random.randint(50, height - 50)
-            size = random.randint(20, 40)
-            overlay_draw.rectangle([x - 5, y - size, x + 5, y + size], fill=cross_color)
-            overlay_draw.rectangle([x - size, y - 5, x + size, y + 5], fill=cross_color)
-    
-    elif theme == 'art':
-        # 붓 터치 효과
-        for i in range(20):
-            x1 = random.randint(0, width)
-            y1 = random.randint(0, height)
-            x2 = x1 + random.randint(-100, 100)
-            y2 = y1 + random.randint(-100, 100)
-            color = random.choice([colors['primary'], colors['accent'], colors['secondary']])
-            overlay_draw.line([(x1, y1), (x2, y2)], 
-                            fill=color + (30,), width=random.randint(3, 10))
-    
-    elif theme == 'business':
-        # 대각선 스트라이프
-        stripe_color = colors['primary'] + (15,)
-        for i in range(-height, width + height, 80):
-            overlay_draw.polygon([
-                (i, 0), (i + 40, 0), (i + 40 - height, height), (i - height, height)
-            ], fill=stripe_color)
-    
-    elif theme == 'education':
-        # 점선 노트 패턴
-        line_color = colors['primary'] + (25,)
-        for i in range(60, height, 40):
-            for x in range(0, width, 20):
-                overlay_draw.rectangle([x, i, x + 10, i + 1], fill=line_color)
-    
-    elif theme == 'sports':
-        # 다이나믹한 대각선
-        for i in range(8):
-            x1 = random.randint(-200, 0)
-            y1 = random.randint(0, height)
-            x2 = x1 + random.randint(200, 400)
-            y2 = y1 - random.randint(100, 200)
-            overlay_draw.line([(x1, y1), (x2, y2)], 
-                            fill=colors['primary'] + (20,), width=random.randint(5, 15))
-    
-    elif theme == 'music':
-        # 오선지 패턴
-        staff_color = colors['primary'] + (25,)
-        for i in range(5):
-            y = 100 + i * 30
-            overlay_draw.line([(0, y), (width // 2, y)], fill=staff_color, width=2)
-        
-        # 음표 모양 원들
-        for i in range(10):
-            x = random.randint(0, width)
-            y = random.randint(0, height)
-            size = random.randint(15, 30)
-            overlay_draw.ellipse([x, y, x + size, y + size], fill=colors['secondary'] + (30,))
-    
-    img = img.convert('RGBA')
-    img = Image.alpha_composite(img, overlay)
-    img = img.filter(ImageFilter.GaussianBlur(radius=8))
-    
-    return img.convert('RGB')
-
-def add_theme_images_to_card(card_img, theme, template, colors):
-    """테마에 맞는 PNG 이미지를 명함에 배치"""
-    theme_images = get_theme_images(theme)
-    
-    if not theme_images:
-        return card_img
-    
-    available_images = [img for img in theme_images if os.path.exists(img)]
-    
-    if not available_images:
-        return card_img
-    
-    num_images = random.randint(1, min(2, len(available_images)))
-    selected_images = random.sample(available_images, num_images)
-    
-    card_img = card_img.convert('RGBA')
-    
-    for idx, img_path in enumerate(selected_images):
+        bbox = draw.textbbox((0, 0), text, font=font)
+        return bbox[2] - bbox[0]
+    except AttributeError:
         try:
-            theme_img = Image.open(img_path).convert('RGBA')
-            
-            if template == 'modern':
-                positions = [
-                    (50, 50, 100, 100),
-                    (50, card_img.height - 150, 100, 100)
-                ]
-            else:  # minimalist
-                positions = [
-                    (card_img.width - 150, 50, 80, 80),
-                    (50, card_img.height - 130, 80, 80)
-                ]
-            
-            if idx < len(positions):
-                x, y, w, h = positions[idx]
-                theme_img = theme_img.resize((w, h), Image.Resampling.LANCZOS)
-                
-                alpha = theme_img.split()[3]
-                alpha = alpha.point(lambda p: int(p * 0.4))
-                theme_img.putalpha(alpha)
-                
-                card_img.paste(theme_img, (x, y), theme_img)
-        
-        except Exception as e:
-            print(f"테마 이미지 추가 실패: {e}")
-            continue
-    
-    return card_img
+            return int(font.getlength(text))
+        except:
+            return len(text) * font.size // 2
 
-# ========== 개성 템플릿 배경 생성 ==========
+def calculate_text_position(text_width, base_x, align):
+    """텍스트 정렬에 따른 X 좌표 계산"""
+    if align == 'center':
+        return base_x - (text_width // 2)
+    elif align == 'right':
+        return base_x - text_width
+    return base_x
 
-def create_galaxy_background(width, height, colors):
-    """갤럭시 배경"""
-    img = Image.new('RGB', (width, height), (5, 5, 15))
-    overlay = Image.new('RGBA', (width, height), (0, 0, 0, 0))
-    overlay_draw = ImageDraw.Draw(overlay)
-    
-    nebula_spots = [(random.randint(-200, width), random.randint(-200, height), 
-                     random.randint(300, 600)) for _ in range(4)]
-    
-    nebula_colors = [
-        tuple(c // 3 for c in colors['accent']) + (60,),
-        tuple(c // 3 for c in colors['secondary']) + (60,),
-        tuple(c // 4 for c in colors['primary']) + (40,)
-    ]
-    
-    for (x, y, size), color in zip(nebula_spots, nebula_colors * 2):
-        for i in range(5, 0, -1):
-            current_size = size * (i / 5)
-            alpha = int(60 * (i / 5))
-            current_color = color[:3] + (alpha,)
-            overlay_draw.ellipse([
-                x - current_size // 2, y - current_size // 2,
-                x + current_size // 2, y + current_size // 2
-            ], fill=current_color)
-    
-    img = img.convert('RGBA')
-    img = Image.alpha_composite(img, overlay)
-    img = img.filter(ImageFilter.GaussianBlur(radius=30))
-    
-    return img.convert('RGB')
-
-def create_cute_background(width, height, colors):
-    """큐트 배경"""
-    pastel_bg = tuple(min(255, c + 80) for c in colors['primary'])
-    img = Image.new('RGB', (width, height), pastel_bg)
-    overlay = Image.new('RGBA', (width, height), (0, 0, 0, 0))
-    overlay_draw = ImageDraw.Draw(overlay)
-    
-    pastel_colors = [
-        colors['accent'] + (30,),
-        colors['secondary'] + (30,),
-        tuple(min(255, c + 100) for c in colors['primary']) + (40,)
-    ]
-    
-    circles = [
-        (-100, -100, 400, 400),
-        (width - 400, height - 400, width + 100, height + 100),
-        (width // 2 - 200, -150, width // 2 + 200, 250),
-    ]
-    
-    for i, circle in enumerate(circles):
-        color = pastel_colors[i % len(pastel_colors)]
-        overlay_draw.ellipse(circle, fill=color)
-    
-    for i in range(50):
-        x = random.randint(0, width)
-        y = random.randint(0, height)
-        size = random.randint(3, 8)
-        color = random.choice(pastel_colors)
-        overlay_draw.ellipse([x, y, x + size, y + size], fill=color)
-    
-    img = img.convert('RGBA')
-    img = Image.alpha_composite(img, overlay)
-    img = img.filter(ImageFilter.GaussianBlur(radius=20))
-    
-    return img.convert('RGB')
-
-def create_neon_background(width, height, colors):
-    """네온 배경"""
-    img = Image.new('RGB', (width, height), (10, 10, 20))
-    overlay = Image.new('RGBA', (width, height), (0, 0, 0, 0))
-    overlay_draw = ImageDraw.Draw(overlay)
-    
-    neon_colors = [
-        colors['primary'] + (100,),
-        colors['accent'] + (100,),
-        colors['secondary'] + (80,)
-    ]
-    
-    for i in range(5):
-        y = random.randint(0, height)
-        color = random.choice(neon_colors)
-        for thickness in range(8, 0, -1):
-            alpha = int(100 * (thickness / 8))
-            line_color = color[:3] + (alpha,)
-            overlay_draw.line([(0, y), (width, y)], fill=line_color, width=thickness)
-    
-    img = img.convert('RGBA')
-    img = Image.alpha_composite(img, overlay)
-    img = img.filter(ImageFilter.GaussianBlur(radius=15))
-    
-    return img.convert('RGB')
-
-def create_retro_background(width, height, colors):
-    """레트로 배경"""
-    retro_bg = (245, 222, 179)
-    img = Image.new('RGB', (width, height), retro_bg)
-    draw = ImageDraw.Draw(img)
-    
-    for i in range(height):
-        ratio = i / height
-        darkness = int(15 * ratio)
-        color = tuple(max(0, c - darkness) for c in retro_bg)
-        draw.line([(0, i), (width, i)], fill=color)
-    
-    grid_color = tuple(c - 20 for c in retro_bg)
-    for i in range(0, width, 60):
-        draw.line([(i, 0), (i, height)], fill=grid_color, width=1)
-    for i in range(0, height, 60):
-        draw.line([(0, i), (width, i)], fill=grid_color, width=1)
-    
-    return img
-
-def create_grunge_background(width, height, colors):
-    """그런지 배경"""
-    base_color = tuple(max(0, c - 40) for c in colors['primary'])
-    img = Image.new('RGB', (width, height), base_color)
-    
-    overlay = Image.new('RGBA', (width, height), (0, 0, 0, 0))
-    overlay_draw = ImageDraw.Draw(overlay)
-    
-    for i in range(20):
-        x1 = random.randint(-100, width)
-        y1 = random.randint(-100, height)
-        x2 = x1 + random.randint(-300, 300)
-        y2 = y1 + random.randint(-300, 300)
-        
-        color_choice = random.choice([colors['accent'], colors['secondary'], base_color])
-        stroke_color = tuple(max(0, min(255, c + random.randint(-30, 30))) 
-                           for c in color_choice) + (random.randint(20, 60),)
-        
-        overlay_draw.line([(x1, y1), (x2, y2)], fill=stroke_color, 
-                         width=random.randint(50, 150))
-    
-    img = img.convert('RGBA')
-    img = Image.alpha_composite(img, overlay)
-    img = img.filter(ImageFilter.GaussianBlur(radius=2))
-    
-    return img.convert('RGB')
-
-# ========== 메인 명함 생성 함수 ==========
-
-def create_business_card(user_data, style=None):
-    """
-    명함 이미지 생성
-    
-    Args:
-        user_data: 사용자 정보 (name, school, phone, favorite_color)
-        style: 사용자가 선택한 스타일 (None이면 랜덤)
-    
-    Returns:
-        (명함 이미지, 스타일 이름)
-    """
-    # 스타일 선택
-    if style is None or style not in USER_STYLES:
-        style = random.choice(USER_STYLES)
-    
-    style_config = STYLE_MAPPING[style]
-    width, height = 800, 500
-    
-    # 개성 템플릿
-    if style_config['type'] == 'stylized':
-        template = style_config['template']
-        base_color = user_data.get('favorite_color', '#3498db')
-        colors = generate_color_palette(base_color, 'complementary')
-        
-        # 배경 생성
-        if template == 'galaxy':
-            img = create_galaxy_background(width, height, colors)
-        elif template == 'cute':
-            img = create_cute_background(width, height, colors)
-        elif template == 'neon':
-            img = create_neon_background(width, height, colors)
-        elif template == 'retro':
-            img = create_retro_background(width, height, colors)
-        elif template == 'grunge':
-            img = create_grunge_background(width, height, colors)
-        else:
-            img = Image.new('RGB', (width, height), colors['light'])
-        
-        draw = ImageDraw.Draw(img)
-        
-        # 템플릿별 컨텐츠 그리기
-        if template == 'galaxy':
-            draw_galaxy_template(draw, width, height, colors, user_data, 'left_align')
-        elif template == 'cute':
-            draw_cute_template(draw, width, height, colors, user_data, 'center')
-        elif template == 'neon':
-            draw_neon_template(draw, width, height, colors, user_data, 'center')
-        elif template == 'retro':
-            draw_retro_template(draw, width, height, colors, user_data, 'center')
-        elif template == 'grunge':
-            draw_grunge_template(draw, width, height, colors, user_data, 'center')
-    
-    # 베이스 템플릿 + 테마
-    else:
-        theme = style_config['theme']
-        template = random.choice(BASE_TEMPLATES)
-        
-        base_color = THEME_COLORS.get(theme, user_data.get('favorite_color', '#3498db'))
-        colors = generate_color_palette(base_color, 'complementary')
-        
-        # 테마 배경 생성
-        img = create_themed_background(width, height, theme, colors)
-        draw = ImageDraw.Draw(img)
-        
-        # 베이스 템플릿 그리기
-        if template == 'modern':
-            draw_modern_template(draw, width, height, colors, user_data, 'left_align')
-        else:
-            draw_minimalist_template(draw, width, height, colors, user_data, 'left_align')
-        
-        # 테마 이미지 추가
-        img = add_theme_images_to_card(img, theme, template, colors)
-        img = img.convert('RGB')
-    
-    return img, style
-
-# ========== 템플릿 그리기 함수들 (기존 코드 유지) ==========
-
-def draw_modern_template(draw, width, height, colors, user_data, layout):
-    # 배경 제거 (이미 배경 생성됨)
-    draw.rectangle([0, 0, width // 4, height], fill=colors['primary'])
-    draw.line([(width // 4, 0), (width // 4, height)], fill=colors['accent'], width=3)
-
-    font_large = get_font(48, 'bold')
-    font_medium = get_font(32, 'regular')
-    font_small = get_font(24, 'regular')
-    text_color = colors['dark']
-
-    name_text = user_data['name']
-    school_text = user_data['school']
-    phone_text = user_data['phone']
-
-    name_width = draw.textbbox((0,0), name_text, font=font_large)[2]
-    school_width = draw.textbbox((0,0), school_text, font=font_medium)[2]
-    phone_width = draw.textbbox((0,0), phone_text, font=font_small)[2]
-
-    name_x = (width - name_width) // 2
-    name_y = 180
-    school_x = (width - school_width) // 2
-    school_y = 240
-
-    draw.text((name_x, name_y), name_text, fill=text_color, font=font_large)
-    draw.text((school_x, school_y), school_text, fill=text_color, font=font_medium)
-
-    phone_x = (width - phone_width) // 2
-    phone_y = height - 100
-
-    draw.text((phone_x, phone_y), phone_text, fill=text_color, font=font_small)
-
-def draw_retro_template(draw, width, height, colors, user_data, layout):
-    # 배경 레트로 장식
-    draw.polygon([(width - 200, height), (width, height - 200), (width, height)], fill=colors['primary'])
-    draw.polygon([(width - 150, height), (width, height - 150), (width, height)], fill=colors['accent'])
-    for i in range(5):
-        draw.rectangle([10+i*2, 10+i*2, width-10-i*2, height-10-i*2], outline=colors['primary'], width=2)
-
-    font_large = get_font(44, 'bold', font_name='retro')
-    font_medium = get_font(30, 'regular', font_name='retro')
-    font_small = get_font(26, 'regular', font_name='retro')
-    text_color = colors['dark']
-
-    name_text = user_data['name']
-    school_text = user_data['school']
-    phone_text = user_data['phone']
-
-    phone_width = draw.textbbox((0,0), phone_text, font=font_small)[2]
-
-    name_x = 120
-    name_y = 160
-    school_x = 120
-    school_y = 220
-
-    draw.text((name_x, name_y), name_text, fill=text_color, font=font_large)
-    draw.text((school_x, school_y), school_text, fill=text_color, font=font_medium)
-
-    phone_x = width - phone_width - 120
-    phone_y = height - 80
-
-    draw.text((phone_x, phone_y), phone_text, fill=text_color, font=font_small)
-
-def draw_neon_template(draw, width, height, colors, user_data, layout):
-    neon_color = colors['primary']
-    for thickness in range(8, 0, -1):
-        draw.rectangle([60-thickness, 60-thickness, width-60+thickness, height-60+thickness], 
-                      outline=neon_color, width=thickness)
-
-    font_large = get_font(46, 'bold')
-    font_medium = get_font(32, 'regular')
-    font_small = get_font(28, 'regular')
-
-    name_text = user_data['name']
-    school_text = user_data['school']
-    phone_text = user_data['phone']
-
-    name_width = draw.textbbox((0,0), name_text, font=font_large)[2]
-    school_width = draw.textbbox((0,0), school_text, font=font_medium)[2]
-    phone_width = draw.textbbox((0,0), phone_text, font=font_small)[2]
-
-    name_x = (width - name_width) // 2
-    name_y = 150
-
-    glow_color = colors['accent']
-    main_color = (255, 255, 255)
-
+def draw_neon_text(draw, x, y, text, font, glow_color, main_color):
+    """네온 효과 텍스트 그리기"""
     offsets = [-2, 2, -3, 3]
     for offset in offsets:
-        draw.text((name_x + offset, name_y), name_text, fill=glow_color, font=font_large)
-        draw.text((name_x, name_y + offset), name_text, fill=glow_color, font=font_large)
+        draw.text((x + offset, y), text, fill=glow_color, font=font)
+        draw.text((x, y + offset), text, fill=glow_color, font=font)
 
-    draw.text((name_x, name_y), name_text, fill=main_color, font=font_large)
+    for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+        draw.text((x + dx, y + dy), text, fill=main_color, font=font)
 
-    school_x = (width - school_width) // 2
-    school_y = height - 120
-    phone_x = (width - phone_width) // 2
-    phone_y = height - 80
+    draw.text((x, y), text, fill=main_color, font=font)
 
-    draw.text((school_x, school_y), school_text, fill=colors['accent'], font=font_medium)
-    draw.text((phone_x, phone_y), phone_text, fill=colors['secondary'], font=font_small)
-
-def draw_galaxy_template(draw, width, height, colors, user_data, layout):
-    # 별 추가
-    for i in range(100):
-        x = random.randint(0, width)
-        y = random.randint(0, height)
-        brightness = random.randint(150, 255)
-        size = random.choice([1] * 90 + [2] * 10)
-        if size == 1:
-            draw.point((x, y), fill=(brightness, brightness, brightness))
-        else:
-            draw.ellipse([x-1, y-1, x+1, y+1], fill=(brightness, brightness, brightness))
-
-    font_large = get_font(48, 'bold')
-    font_medium = get_font(34, 'regular')
-    font_small = get_font(30, 'regular')
-
-    name_text = user_data['name']
-    school_text = user_data['school']
-    phone_text = user_data['phone']
-
-    phone_width = draw.textbbox((0,0), phone_text, font=font_small)[2]
-
-    name_x = 110
-    name_y = 150
-    school_x = 110
-    school_y = 220
-
-    draw.text((name_x, name_y), name_text, fill=(255, 255, 255), font=font_large)
-    draw.text((school_x, school_y), school_text, fill=(200, 200, 255), font=font_medium)
-
-    phone_x = width - phone_width - 110
-    phone_y = height - 100
-
-    draw.text((phone_x, phone_y), phone_text, fill=(255, 255, 200), font=font_small)
-
-def draw_minimalist_template(draw, width, height, colors, user_data, layout):
-    draw.line([(100, 140), (width-300, 140)], fill=colors['primary'], width=2)
-    draw.line([(300, height-100), (width-100, height-100)], fill=colors['primary'], width=2)
-
-    font_large = get_font(42, 'bold')
-    font_medium = get_font(28, 'regular')
-    font_small = get_font(24, 'regular')
-
-    name_text = user_data['name']
-    school_text = user_data['school']
-    phone_text = user_data['phone']
-
-    name_x = 120
-    name_y = 180
-    school_x = 120
-    school_y = 240
-
-    draw.text((name_x, name_y), name_text, fill=(50, 50, 50), font=font_large)
-    draw.text((school_x, school_y), school_text, fill=(100, 100, 100), font=font_medium)
-
-    phone_width = draw.textbbox((0, 0), phone_text, font=font_small)[2]
-    phone_x = width - phone_width - 120
-    phone_y = height - 140
-
-    draw.text((phone_x, phone_y), phone_text, fill=(100, 100, 100), font=font_small)
+def draw_common_text_layout(draw, width, height, template, colors, user_data):
+    """공통 텍스트 레이아웃 그리기 (중복 제거)"""
+    config = TEMPLATE_CONFIG.get(template)
+    if not config:
+        logger.error(f"알 수 없는 템플릿: {template}")
+        return
     
-def draw_grunge_template(draw, width, height, colors, user_data, layout):
-    accent_rgb = colors['accent']
-    secondary_rgb = colors['secondary']
-    base_color = tuple(max(0, c-30) for c in colors['primary'])
+    # 폰트 로드
+    fonts = {
+        size: get_font(**config['fonts'][size])
+        for size in ['large', 'medium', 'small']
+    }
 
-    for i in range(100):
-        x, y = random.randint(0, width), random.randint(0, height)
-        size = random.randint(1, 5)
-        fill_color = random.choice([base_color] * 3 + [accent_rgb] * 5 + [secondary_rgb] * 2)
-        draw.ellipse([x, y, x+size, y+size], fill=fill_color)
+    # 텍스트 데이터 매핑
+    text_mapping = {
+        'name': {'text': user_data['name'], 'font': fonts['large']},
+        'school': {'text': user_data['school'], 'font': fonts['medium']},
+        'phone': {'text': user_data['phone'], 'font': fonts['small']},
+    }
 
-    for i in range(20):
-        x1, y1 = random.randint(0, width), random.randint(0, height)
-        x2, y2 = random.randint(0, width), random.randint(0, height)
-        draw.line([(x1, y1), (x2, y2)], fill=colors['accent'], width=random.randint(1,3))
+    # 각 텍스트 그리기
+    for key, data in text_mapping.items():
+        text = data['text']
+        font = data['font']
+        layout = config['layout'][key]
+        
+        # 색상 결정
+        color_key = config['colors'][key]
+        color = colors[color_key] if isinstance(color_key, str) else color_key
+        
+        # 위치 계산
+        text_width = get_text_width(draw, text, font)
+        base_x = layout['x'](width, height)
+        x = calculate_text_position(text_width, base_x, layout['align'])
+        y = layout['y'](width, height)
 
-    font_large = get_font(44, 'bold', font_name='grunge')
-    font_medium = get_font(30, 'regular', font_name='grunge')
-    font_small = get_font(26, 'regular', font_name='grunge')
-    text_color = colors['light']
+        # 템플릿별 특수 효과
+        if template == 'neon':
+            main_color = (255, 255, 255) if key == 'name' else color
+            draw_neon_text(draw, x, y, text, font, colors['accent'], main_color)
+        else:
+            draw.text((x, y), text, fill=color, font=font)
 
-    name_text = user_data['name']
-    school_text = user_data['school']
-    phone_text = user_data['phone']
-
-    phone_width = draw.textbbox((0,0), phone_text, font=font_small)[2]
-
-    name_x = 100
-    name_y = 160
-    school_x = 100
-    school_y = 220
-
-    draw.text((name_x, name_y), name_text, fill=text_color, font=font_large)
-    draw.text((school_x, school_y), school_text, fill=text_color, font=font_medium)
-
-    phone_x = width - phone_width - 100
-    phone_y = height - 100
-
-    draw.text((phone_x, phone_y), phone_text, fill=text_color, font=font_small)
-
-# ========== QR 코드 생성 ==========
-
-def generate_qr_code(download_url):
-    qr = qrcode.QRCode(
-        version=1,
-        error_correction=qrcode.constants.ERROR_CORRECT_L,
-        box_size=10,
-        border=4,
-    )
-    qr.add_data(download_url)
-    qr.make(fit=True)
-
-    qr_img = qr.make_image(fill_color="black", back_color="white")
-    return qr_img
+def draw_modern_background(draw, width, height, colors):
+    draw.rectangle([0, 0, width, height], fill=colors['light'])
+    draw.polygon([(width - 200, 0), (width, 0), (width, 200)], fill=colors['primary'])
+    draw.line([(0, height - 100), (width, height)], fill=colors['accent'], width=5)
 
 def draw_cute_sparkle(draw, x, y, size, fill):
     half_size = size // 2
@@ -752,17 +307,20 @@ def draw_cute_sparkle(draw, x, y, size, fill):
 
 def draw_polka_dot(draw, x, y, size, fill):
     radius = size // 2
-    draw.ellipse([x - radius, y -radius, x + radius, y + radius], fill=fill)
+    draw.ellipse([x - radius, y - radius, x + radius, y + radius], fill=fill)
 
-def draw_cute_template(draw, width, height, colors, user_data, layout):
-    # 배경은 이미 생성되어 있으므로 추가 패턴만
+def draw_cute_background(draw, width, height, colors):
+    pastel_bg = random.choice([colors['light'], tuple(min(255, c + 50) for c in colors['primary'])])
+    draw.rectangle([0, 0, width, height], fill=pastel_bg)
+    
     pattern_color_1 = colors['accent']
     pattern_color_2 = colors['secondary']
-    for i in range(25):
+    
+    for _ in range(25):
         x = random.randint(30, width - 30)
         y = random.randint(30, height - 30)
         size = random.randint(10, 25)
-
+        
         if random.random() < 0.6:
             fill_color = random.choice([pattern_color_1, pattern_color_2, (255, 255, 255)])
             draw_polka_dot(draw, x, y, size, fill_color)
@@ -770,14 +328,141 @@ def draw_cute_template(draw, width, height, colors, user_data, layout):
             fill_color = random.choice([pattern_color_1, (255, 255, 255)])
             draw_cute_sparkle(draw, x, y, size, fill_color)
 
-    draw.rounded_rectangle([40, 40, width-40, height-40], radius=20, outline=colors['primary'], width=4)
-    
-    font_large = get_font(42, 'bold', font_name='cute')
-    font_medium = get_font(28, 'regular', font_name='cute')
-    font_small = get_font(22, 'regular', font_name='cute')
-    text_color = colors['dark']
+    draw.rounded_rectangle([40, 40, width - 40, height - 40], radius=20, outline=colors['primary'], width=4)
 
-    name_text = user_data['name']
-    school_text = user_data['school']
-    phone
-    #코드 에러난 듯 일단 git add 해놨으니까 해당본 그대로 다시 클로드 돌리기
+def draw_retro_background(draw, width, height, colors):
+    retro_bg = (245, 222, 179)
+    draw.rectangle([0, 0, width, height], fill=retro_bg)
+    
+    grid_color = tuple(max(0, c - 15) for c in retro_bg)
+    for i in range(0, width, 60):
+        draw.line([(i, 0), (i, height)], fill=grid_color, width=1)
+    for i in range(0, height, 60):
+        draw.line([(0, i), (width, i)], fill=grid_color, width=1)
+    
+    draw.polygon([(width - 200, height), (width, height - 200), (width, height)], fill=colors['primary'])
+    draw.polygon([(width - 150, height), (width, height - 150), (width, height)], fill=colors['accent'])
+    
+    for i in range(5):
+        draw.rectangle([10 + i * 2, 10 + i * 2, width - 10 - i * 2, height - 10 - i * 2], 
+                      outline=colors['primary'], width=2)
+
+def draw_galaxy_background(draw, width, height, colors):
+    draw.rectangle([0, 0, width, height], fill=(10, 10, 30))
+    
+    for _ in range(150):
+        x = random.randint(0, width)
+        y = random.randint(0, height)
+        size = random.choice([1] * 80 + [2] * 15 + [3] * 5)
+        brightness = random.randint(100, 255)
+        
+        if size == 1:
+            draw.point((x, y), fill=(brightness, brightness, brightness))
+        else:
+            draw.ellipse([x, y, x + size, y + size], fill=(brightness, brightness, brightness))
+
+def draw_minimalist_background(draw, width, height, colors):
+    draw.rectangle([0, 0, width, height], fill=(255, 255, 255))
+    
+    border_color = (220, 220, 220)
+    draw.rectangle([0, 0, width, 10], fill=border_color)
+    draw.rectangle([0, height - 10, width, height], fill=border_color)
+
+    line_y = height * 2 // 3
+    line_width = width // 5
+    line_start_x = (width - line_width) // 2
+    draw.line([(line_start_x, line_y), (line_start_x + line_width, line_y)], 
+             fill=colors['secondary'], width=2)
+
+def draw_neon_background(draw, width, height, colors):
+    draw.rectangle([0, 0, width, height], fill=(20, 20, 20))
+
+    neon_color = colors['primary']
+    for thickness in range(8, 0, -1):
+        draw.rectangle([60 - thickness, 60 - thickness, width - 60 + thickness, height - 60 + thickness], 
+                      outline=neon_color, width=thickness)
+
+def draw_grunge_background(draw, width, height, colors):
+    base_color = tuple(max(0, c - 30) for c in colors['primary'])
+    draw.rectangle([0, 0, width, height], fill=base_color)
+    
+    accent_rgb = colors['accent']
+    secondary_rgb = colors['secondary']
+    
+    for _ in range(100):
+        x = random.randint(0, width)
+        y = random.randint(0, height)
+        size = random.randint(1, 5)
+        fill_color = random.choice([base_color] * 3 + [accent_rgb] * 5 + [secondary_rgb] * 2)
+        draw.ellipse([x, y, x + size, y + size], fill=fill_color)
+    
+    for _ in range(20):
+        x1, y1 = random.randint(0, width), random.randint(0, height)
+        x2, y2 = random.randint(0, width), random.randint(0, height)
+        draw.line([(x1, y1), (x2, y2)], fill=colors['accent'], width=random.randint(1, 3))
+
+BACKGROUND_DRAWERS = {
+    'modern': draw_modern_background,
+    'cute': draw_cute_background,
+    'retro': draw_retro_background,
+    'galaxy': draw_galaxy_background,
+    'minimalist': draw_minimalist_background,
+    'neon': draw_neon_background,
+    'grunge': draw_grunge_background,
+}
+
+def create_business_card(user_data):
+    """명함 생성 (에러 처리 강화)"""
+    try:
+        # 템플릿 선택
+        template = random.choice(TEMPLATES)
+        
+        # 테마 선택 (템플릿별 제약 적용)
+        available_themes = COLOR_THEMES.copy()
+        if template == 'neon' and 'pastel' in available_themes:
+            available_themes.remove('pastel')
+        elif template == 'minimalist' and 'complementary' in available_themes:
+            available_themes.remove('complementary')
+        
+        theme = random.choice(available_themes)
+        
+        # 색상 팔레트 생성
+        colors = generate_color_palette(user_data.get('favorite_color', '#3498db'), theme)
+        
+        # 이미지 생성
+        width, height = 800, 500
+        img = Image.new('RGB', (width, height), colors['light'])
+        draw = ImageDraw.Draw(img)
+
+        # 배경 그리기
+        background_drawer = BACKGROUND_DRAWERS.get(template)
+        if background_drawer:
+            background_drawer(draw, width, height, colors)
+        else:
+            logger.warning(f"배경 그리기 함수 없음: {template}")
+
+        # 텍스트 그리기
+        draw_common_text_layout(draw, width, height, template, colors, user_data)
+
+        return img, template
+    
+    except Exception as e:
+        logger.error(f"명함 생성 오류: {e}", exc_info=True)
+        raise
+
+def generate_qr_code(download_url):
+    """QR 코드 생성 (에러 처리 추가)"""
+    try:
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_L,
+            box_size=10,
+            border=4,
+        )
+        qr.add_data(download_url)
+        qr.make(fit=True)
+        qr_img = qr.make_image(fill_color="black", back_color="white")
+        return qr_img
+    except Exception as e:
+        logger.error(f"QR 코드 생성 오류: {e}", exc_info=True)
+        raise
